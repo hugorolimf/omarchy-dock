@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "id": "io.github.hugorolimf.dock",
+  "name": "Dock",
+  "version": "1.0.0",
+  "author": "Hugo Rolim Filho",
+  "description": "macOS-style bottom dock: pinned and running apps, hover magnification, auto-hide, Liquid Glass",
+  "kinds": [
+    "panel",
+    "bar-widget"
+  ],
+  "keepLoaded": true,
+  "entryPoints": {
+    "panel": "Main.qml",
+    "barWidget": "BarWidget.qml"
+  },
+  "barWidget": {
+    "displayName": "Dock",
+    "description": "Dock settings: visibility, size, magnification, opacity, Liquid Glass",
+    "category": "Appearance",
+    "allowMultiple": false,
+    "defaultSection": "right"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/hugorolimf/omarchy-dock"
+}
