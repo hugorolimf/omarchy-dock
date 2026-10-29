@@ -1,10 +1,10 @@
 {
   "schemaVersion": 1,
   "id": "io.github.hugorolimf.dock",
-  "name": "Dock",
+  "name": "Glass Dock",
   "version": "1.0.0",
   "author": "Hugo Rolim Filho",
-  "description": "macOS-style bottom dock: pinned and running apps, hover magnification, auto-hide, Liquid Glass",
+  "description": "The macOS dock, on Omarchy: icons that magnify under the pointer, one dock per screen with its workspaces, minimize to the dock, and real refractive Liquid Glass",
   "kinds": [
     "panel",
     "bar-widget"

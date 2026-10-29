@@ -1,24 +1,37 @@
-# Dock
+<div align="center">
 
-A macOS-style dock for the Omarchy shell: pinned and running apps, hover
-magnification, auto-hide, and real Liquid Glass.
+# Glass Dock
 
-- **One dock per screen.** Each dock shows the apps and the Hyprland
-  workspaces of its own monitor (mini icons of their windows; click or scroll
-  to switch).
-- **Pinned and running apps.** Right-click to pin, unpin, move a window to
-  another workspace, or quit the app. Drag icons to reorder; dropping a
-  running app among the pinned ones pins it.
-- **Click like a taskbar.** Click opens the app, focuses it, cycles through its
-  windows, or minimizes it when it is already focused. Minimized windows come
-  back from their icon.
-- **Apps running in the background** (window closed, process alive) keep a dot.
-- **Auto-hide** with a reveal delay, and also while a maximized window fills the
-  screen (when your window script reports it, see below).
-- **Liquid Glass.** With the [Liquid Glass](https://github.com/fasi96/omarchy-liquid-glass)
-  plugin installed, one switch puts refractive glass behind the dock.
-- Size, compact mode, magnification, opacity and workspace badges are all set
-  from the dock's bar panel.
+**The macOS dock, on Omarchy.**
+Icons that swell under your pointer, one dock per screen, and real refractive glass.
+
+![Glass Dock magnifying under the pointer](assets/magnification.gif)
+
+</div>
+
+![Glass Dock on an Omarchy desktop](preview.png)
+
+## Why this one
+
+- 🔍 **Magnification that follows the pointer**, smooth like macOS, with the app
+  name floating above.
+- 🧊 **Real Liquid Glass.** Not a blur: the desktop bends through the dock's edges
+  (with the [Liquid Glass](https://github.com/fasi96/omarchy-liquid-glass) plugin;
+  one switch in the dock's panel).
+- 🖥️ **One dock per screen**, each with its own monitor's workspaces on the right,
+  showing the icons of the windows on each. Click to jump, scroll to step through them.
+- ➖ **Minimize to the dock.** Click a focused app to minimize it, click again to
+  bring it back. Like the Windows taskbar, but prettier.
+- 📌 **Pin, drag, reorder.** Drag icons around; drop a running app among the pinned
+  ones to keep it. Drag a pinned icon out to remove it.
+- 🌙 **Knows what is still running.** Apps whose window you closed but that keep
+  running in the background stay in the dock with a dot.
+- 🫥 **Gets out of the way.** Optional auto-hide with a reveal delay, a compact mode
+  that shrinks the dock when the pointer leaves, and it reserves its own space so
+  tiled windows never end up underneath it.
+- 🗂️ **Right-click menu**: new window, move to another workspace, minimize, restore,
+  close windows, quit the app.
+- 🌍 English and Portuguese, following your system language.
 
 ## Install
 
