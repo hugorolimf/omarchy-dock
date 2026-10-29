@@ -24,13 +24,19 @@ Icons that swell under your pointer, one dock per screen, and real refractive gl
   bring it back. Like the Windows taskbar, but prettier.
 - 📌 **Pin, drag, reorder.** Drag icons around; drop a running app among the pinned
   ones to keep it. Drag a pinned icon out to remove it.
+- 🃏 **Every window, at a glance.** One dot per open window under each icon (the one in
+  focus is a pill, minimized ones hollow). Rest the pointer on an app with several
+  windows and they fan out above its icon as live thumbnails, on glass: click the one
+  you want.
+- 🪟 **Show all windows.** The right-click menu lists the app's windows by title and
+  opens an App Exposé of them.
 - 🌙 **Knows what is still running.** Apps whose window you closed but that keep
   running in the background stay in the dock with a dot.
 - 🫥 **Gets out of the way.** Optional auto-hide with a reveal delay, a compact mode
   that shrinks the dock when the pointer leaves, and it reserves its own space so
   tiled windows never end up underneath it.
-- 🗂️ **Right-click menu**: new window, move to another workspace, minimize, restore,
-  close windows, quit the app.
+- 🗂️ **Right-click menu**: the app's windows, show all windows, new window, move to
+  another workspace, minimize, restore, close windows, quit the app.
 - 🌍 English and Portuguese, following your system language.
 
 ## Install

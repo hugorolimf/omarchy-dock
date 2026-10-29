@@ -19,7 +19,7 @@ Item {
 
   // Portuguese is the source language; anything else gets English.
   readonly property bool portuguese: Qt.locale().name.indexOf("pt") === 0
-  readonly property var english: ({"Remover": "Remove", "Abrir nova janela": "New window", "Mover para a área ": "Move to workspace ", "Mover para uma área nova": "Move to a new workspace", "Minimizar": "Minimize", "Restaurar": "Restore", "Fechar janelas": "Close windows", "Encerrar app": "Quit app", "Fixar na dock": "Keep in Dock", "Desafixar da dock": "Remove from Dock", " — em segundo plano": " — running in the background"})
+  readonly property var english: ({" — minimizada": " — minimized", "Mostrar todas as janelas": "Show all windows", "Remover": "Remove", "Abrir nova janela": "New window", "Mover para a área ": "Move to workspace ", "Mover para uma área nova": "Move to a new workspace", "Minimizar": "Minimize", "Restaurar": "Restore", "Fechar janelas": "Close windows", "Encerrar app": "Quit app", "Fixar na dock": "Keep in Dock", "Desafixar da dock": "Remove from Dock", " — em segundo plano": " — running in the background"})
   function tr(text) { return portuguese ? text : (english[text] || text) }
 
   property var shell: null
@@ -69,6 +69,17 @@ Item {
   // icon bounces, like macOS, until a new window shows up.
   property var launching: ({})
   property int menuIndex: -1
+  // App Exposé: the app whose windows are laid out (key), and whether it is
+  // showing (it fades out before the key clears).
+  property string exposeKey: ""
+  // Hover fan: resting on an app with several windows fans them out above
+  // its icon, like a macOS stack; click one to go to it. fanKey is the app
+  // shown, fanWant the one under the pointer waiting for fanOpen.
+  property string fanKey: ""
+  property string fanWant: ""
+  property bool exposeShown: false
+  readonly property var exposeApp: exposeKey !== "" ? itemMap[exposeKey] || null : null
+  onItemMapChanged: if (exposeShown && (!exposeApp || exposeApp.windows.length === 0)) unexpose()
   // Drag to reorder (like macOS): the key being dragged, the pointer x in
   // the icon strip and where the drag started.
   property string dragKey: ""
@@ -118,8 +129,8 @@ Item {
   // Sized for up to 10 workspaces and never tied to the live count: a
   // surface that resizes when a workspace comes or goes makes the dock jump.
   readonly property int menuRoom: (6 + 10) * 30 + 24
-  readonly property bool shown: !autoHide || hovering || menuIndex >= 0 || dragKey !== "" || items.length === 0
-  readonly property bool engaged: hovering || menuIndex >= 0 || dragKey !== ""
+  readonly property bool shown: !autoHide || hovering || menuIndex >= 0 || fanKey !== "" || dragKey !== "" || items.length === 0
+  readonly property bool engaged: hovering || menuIndex >= 0 || fanKey !== "" || dragKey !== ""
   property real plateScale: cfg.compact && !autoHide && !engaged ? Math.max(0.3, Math.min(1, cfg.compactScale)) : 1
   Behavior on plateScale { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
 
@@ -533,8 +544,47 @@ Item {
         'hl.dispatch(hl.dsp.window.move({ workspace = "special:minimized", window = "address:' + addr(place.address) + '", follow = false }))')
   }
 
-  function restore(item) {
-    var address = item.minimized[item.minimized.length - 1]
+  // The pointer entered/left an app's icon. Several windows: open its fan
+  // after a short rest (at once if another fan is already open).
+  function hoverApp(key, inside) {
+    if (inside) {
+      var it = itemMap[key]
+      fanWant = it && it.windows.length > 1 && menuIndex < 0 && dragKey === "" ? key : ""
+      if (fanWant === "") { fanOpen.stop(); if (fanKey !== "") fanClose.restart() }
+      else if (fanKey !== "") { fanClose.stop(); fanKey = fanWant }
+      else fanOpen.restart()
+    } else if (fanWant === key) {
+      fanWant = ""
+      fanOpen.stop()
+      if (fanKey === key) fanClose.restart()
+    }
+  }
+  // The pointer is on (or left) a card of the open fan.
+  function fanHover(inside) { if (inside) fanClose.stop(); else fanClose.restart() }
+
+  // App Exposé (macOS "Show All Windows").
+  function expose(key) {
+    menuIndex = -1
+    exposeEnd.stop()
+    exposeKey = key
+    exposeShown = true
+    Qt.callLater(function() { exposeRoot.forceActiveFocus() })
+  }
+  function unexpose() {
+    exposeShown = false
+    exposeEnd.restart()
+  }
+
+  // Go to one of the app's windows: back from minimized, or raised.
+  function goToWindow(item, i) {
+    var place = item.places[i]
+    if (place && place.minimized) restoreAddress(place.address)
+    else if (place && place.address) raise(place.address)
+    else if (item.windows[i]) item.windows[i].activate()
+  }
+
+  function restore(item) { restoreAddress(item.minimized[item.minimized.length - 1]) }
+  function restoreAddress(address) {
     if (!address || currentWs <= 0) return
     var a = addr(address)
     Quickshell.execDetached(["sh", "-c", 'hyprctl dispatch "$1" >/dev/null && hyprctl eval "$2"', "sh",
@@ -741,6 +791,167 @@ Item {
     target: "dock"
     function toggleAutoHide(): string { return root.toggleAutoHide() }
     function state(): string { return root.autoHide ? "autohide" : "fixed" }
+    function expose(app: string): void { root.expose(root.keyOf(app)) }
+    function unexpose(): void { root.unexpose() }
+    function fan(app: string): void { root.fanKey = root.keyOf(app) }
+    function unfan(): void { root.fanKey = "" }
+  }
+
+  Timer {
+    id: fanOpen
+    interval: 250
+    onTriggered: if (root.fanWant !== "") root.fanKey = root.fanWant
+  }
+  Timer {
+    id: fanClose
+    interval: 300
+    onTriggered: root.fanKey = ""
+  }
+
+  Timer {
+    id: exposeEnd
+    interval: 200
+    onTriggered: root.exposeKey = ""
+  }
+
+  // App Exposé (macOS "Show All Windows"): the screen dims and the app's
+  // windows sit side by side, live; click one to go to it, anywhere else
+  // (or Esc) to leave. Opens on this dock's monitor.
+  PanelWindow {
+    id: exposeWin
+    screen: root.dockScreen
+    visible: root.exposeKey !== ""
+    anchors { top: true; bottom: true; left: true; right: true }
+    color: "transparent"
+    WlrLayershell.namespace: "omarchy-dock-expose"
+    WlrLayershell.layer: WlrLayer.Overlay
+    WlrLayershell.keyboardFocus: WlrKeyboardFocus.Exclusive
+    exclusionMode: ExclusionMode.Ignore
+
+    Item {
+      id: exposeRoot
+      anchors.fill: parent
+      focus: true
+      Keys.onEscapePressed: root.unexpose()
+      opacity: root.exposeShown ? 1 : 0
+      Behavior on opacity { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
+
+      readonly property var app: root.exposeApp
+      readonly property int n: app ? app.windows.length : 0
+      readonly property int cols: n <= 3 ? Math.max(1, n) : Math.ceil(Math.sqrt(n))
+      readonly property int rows: Math.max(1, Math.ceil(n / cols))
+      readonly property real gap: 32
+      readonly property real label: 36
+      readonly property real tileW: Math.min(560, (width * 0.86 - gap * (cols - 1)) / cols,
+                                             ((height * 0.72 - gap * (rows - 1)) / rows - label) * 1.6)
+
+      Rectangle { anchors.fill: parent; color: Qt.rgba(0, 0, 0, 0.6) }
+      MouseArea { anchors.fill: parent; onClicked: root.unexpose() }
+
+      Grid {
+        anchors.centerIn: parent
+        columns: exposeRoot.cols
+        spacing: exposeRoot.gap
+        scale: root.exposeShown ? 1 : 0.94
+        Behavior on scale { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
+
+        Repeater {
+          model: exposeRoot.n
+          Item {
+            id: etile
+            required property int index
+            readonly property var toplevel: exposeRoot.app ? exposeRoot.app.windows[index] : null
+            readonly property var place: (exposeRoot.app && exposeRoot.app.places || [])[index] || ({})
+            width: exposeRoot.tileW
+            height: exposeRoot.tileW / 1.6 + exposeRoot.label
+
+            Rectangle {
+              anchors.fill: eshot
+              anchors.margins: -6
+              radius: 12
+              color: "transparent"
+              border.width: 3
+              border.color: Commons.Color.accent
+              opacity: tileMouse.containsMouse ? 1 : 0
+              Behavior on opacity { NumberAnimation { duration: 120 } }
+            }
+
+            // The live window, or the app's icon until a frame arrives.
+            Item {
+              id: eshot
+              anchors { top: parent.top; left: parent.left; right: parent.right }
+              height: parent.height - exposeRoot.label
+              opacity: etile.place.minimized ? 0.55 : 1
+
+              // Solid backing: translucent windows (the terminal) would
+              // otherwise show the screen behind through the thumbnail.
+              Rectangle {
+                anchors.fill: eview
+                visible: eview.hasContent
+                radius: 8
+                color: Qt.rgba(Commons.Color.menu.background.r, Commons.Color.menu.background.g, Commons.Color.menu.background.b, 1)
+              }
+
+              ScreencopyView {
+                id: eview
+                readonly property real aspect: sourceSize.height > 0 ? sourceSize.width / sourceSize.height : 16 / 10
+                anchors.centerIn: parent
+                width: Math.min(parent.width, parent.height * aspect)
+                height: Math.min(parent.height, parent.width / aspect)
+                captureSource: root.exposeShown && etile.toplevel ? etile.toplevel : null
+                live: true
+                paintCursor: false
+                constraintSize: Qt.size(width * 2, height * 2)
+                visible: hasContent
+                layer.enabled: true
+                layer.smooth: true
+              }
+
+              Image {
+                anchors.centerIn: parent
+                visible: !eview.hasContent
+                width: Math.min(parent.width, parent.height) * 0.45
+                height: width
+                sourceSize: Qt.size(256, 256)
+                source: exposeRoot.app ? root.iconFor(root.iconCandidates(exposeRoot.app.appId), 0) : ""
+                smooth: true
+                mipmap: true
+              }
+            }
+
+            Rectangle {
+              anchors.horizontalCenter: parent.horizontalCenter
+              anchors.bottom: parent.bottom
+              width: Math.min(parent.width, etitle.implicitWidth + 20)
+              height: 26
+              radius: 13
+              color: Commons.Color.menu.background
+              Text {
+                id: etitle
+                anchors.centerIn: parent
+                width: Math.min(implicitWidth, parent.parent.width - 20)
+                elide: Text.ElideRight
+                text: (etile.toplevel && etile.toplevel.title || (exposeRoot.app ? exposeRoot.app.name : ""))
+                      + (etile.place.minimized ? root.tr(" — minimizada") : "")
+                color: Commons.Color.menu.text
+                font.pixelSize: 13
+              }
+            }
+
+            MouseArea {
+              id: tileMouse
+              anchors.fill: parent
+              hoverEnabled: true
+              onClicked: {
+                var app = exposeRoot.app, i = etile.index
+                root.unexpose()
+                if (app) root.goToWindow(app, i)
+              }
+            }
+          }
+        }
+      }
+    }
   }
 
   PanelWindow {
@@ -769,17 +980,18 @@ Item {
       readonly property bool resting: root.plateScale < 1 && !root.hovering
       anchors.horizontalCenter: parent.horizontalCenter
       anchors.bottom: parent.bottom
-      width: root.menuIndex >= 0 ? Math.min(parent.width, plate.width + 260)
+      width: root.fanKey !== "" ? parent.width
+        : root.menuIndex >= 0 ? Math.min(parent.width, plate.width + 260)
         : resting ? plate.width * root.plateScale + 8 : plate.width + 20
       height: !root.shown ? 4
-        : root.menuIndex >= 0 ? parent.height
+        : root.menuIndex >= 0 || root.fanKey !== "" ? parent.height
         : resting ? plate.height * root.plateScale + 6 : root.headroom
     }
 
     Timer {
       id: hideDelay
       interval: 400
-      onTriggered: { root.hovering = false; root.menuIndex = -1 }
+      onTriggered: { root.hovering = false; root.menuIndex = -1; root.fanKey = "" }
     }
 
     // Like macOS: while hidden, the pointer has to rest on the screen edge
@@ -807,7 +1019,8 @@ Item {
             hideDelay.restart()
           }
         }
-        onPointChanged: if (hovered) root.hoverX = point.position.x
+        // Up in an open fan the icons hold still (the fan hangs off one).
+        onPointChanged: if (hovered && !(root.fanKey !== "" && point.position.y < plate.y)) root.hoverX = point.position.x
       }
 
     Rectangle {
@@ -856,7 +1069,7 @@ Item {
             required property string key
             required property int index
             readonly property bool dragging: root.dragKey === key
-            z: dragging ? 5 : 0
+            z: dragging || root.fanKey === key ? 5 : 0
             readonly property var app: root.itemMap[key] || ({ id: key, appId: key, name: key, pinned: false, windows: [] })
             // From the resting layout, like macOS: using the live x/width
             // made zoom depend on itself (binding loop, wasted CPU).
@@ -906,10 +1119,16 @@ Item {
             Behavior on width { enabled: cell.grow === 1; NumberAnimation { duration: 70 } }
             Behavior on height { NumberAnimation { duration: 70 } }
 
+            // The icon is drawn a bit smaller than its slot and raised, so the
+            // running dot sits inside the slot under it (the plate keeps its size).
             Image {
+              // Centred on the icon's own room: the slot also carries the gap
+              // to the next icon on its right.
               anchors.horizontalCenter: parent.horizontalCenter
+              anchors.horizontalCenterOffset: -root.spacing * cell.grow / 2
               anchors.bottom: parent.bottom
-              width: root.baseSize * cell.zoom
+              anchors.bottomMargin: Math.round(root.baseSize * cell.zoom * 0.17)
+              width: root.baseSize * cell.zoom * 0.80
               height: width
               scale: cell.grow * cell.poof
               opacity: cell.grow * (cell.lifted ? 0.6 : 1)
@@ -952,30 +1171,52 @@ Item {
               onIconListChanged: iconTry = 0
               source: root.iconFor(iconList, iconTry)
               onStatusChanged: if (status === Image.Error) Qt.callLater(() => iconTry++)
-              sourceSize: Qt.size(128, 128)
+              // Rasterised well above the shown size and scaled down with
+              // mipmaps: plain smoothing left round icons (Spotify) jagged.
+              sourceSize: Qt.size(256, 256)
               smooth: true
+              mipmap: true
               fillMode: Image.PreserveAspectFit
             }
 
-            // Running indicator.
-            Rectangle {
+            // Running indicator: one dot per window (up to 3), so two
+            // terminals don't read as one.
+            Row {
+              id: dots
               // Dim dot: running in the background with no window (closed
               // with Super + W); Super + Q or the menu quits it.
               readonly property bool background: !!cell.app.background
               readonly property bool on: cell.app.windows.length > 0 || background
-              // Hollow dot: the app is open but all its windows are minimized.
-              readonly property bool allMinimized: cell.app.windows.length > 0 && (cell.app.shown || []).length === 0
-              border.width: allMinimized ? 1 : 0
-              border.color: Commons.Color.menu.text
-              opacity: on ? (background ? 0.35 : 1) : 0
-              scale: on ? 1 : 0.2
-              Behavior on opacity { NumberAnimation { duration: 220 } }
-              Behavior on scale { NumberAnimation { duration: 220; easing.type: Easing.OutBack } }
-              width: 4; height: 4; radius: 2
-              color: allMinimized ? "transparent" : Commons.Color.menu.text
+              readonly property int active: on && !background ? root.activeWindow(cell.app) : -1
+              spacing: 3
               anchors.horizontalCenter: parent.horizontalCenter
-              anchors.top: parent.bottom
-              anchors.topMargin: 1
+              anchors.horizontalCenterOffset: -root.spacing * cell.grow / 2
+              anchors.bottom: parent.bottom
+              // ~5 px clear of the icon above, inside the slot
+              anchors.bottomMargin: 2
+              Repeater {
+                model: Math.max(1, Math.min(3, cell.app.windows.length))
+                Rectangle {
+                  required property int index
+                  // Hollow dot: this window is minimized.
+                  readonly property bool minimized: !dots.background && !!((cell.app.places || [])[index] || {}).minimized
+                  // The window in focus gets a short pill instead of a dot, so
+                  // the active one reads at a glance (the third dot stands for
+                  // any window past it).
+                  readonly property bool focused: dots.active >= 0 && Math.min(dots.active, 2) === index
+                  border.width: minimized ? 1 : 0
+                  border.color: Commons.Color.menu.text
+                  opacity: dots.on ? (dots.background ? 0.35 : focused ? 1 : 0.75) : 0
+                  scale: dots.on ? 1 : 0.2
+                  Behavior on opacity { NumberAnimation { duration: 300; easing.type: Easing.Bezier; easing.bezierCurve: [0.32, 0.72, 0, 1, 1, 1] } }
+                  Behavior on scale { NumberAnimation { duration: 300; easing.type: Easing.OutBack } }
+                  width: focused ? 14 : 5
+                  height: 5
+                  radius: 2.5
+                  Behavior on width { NumberAnimation { duration: 380; easing.type: Easing.Bezier; easing.bezierCurve: [0.32, 0.72, 0, 1, 1, 1] } }
+                  color: minimized ? "transparent" : Commons.Color.menu.text
+                }
+              }
             }
 
             // Workspace badge: where the app's windows are, shown once any of
@@ -1006,7 +1247,7 @@ Item {
 
             // Name tooltip.
             Rectangle {
-              visible: tip.hovered && root.menuIndex < 0 && root.dragKey === ""
+              visible: tip.hovered && root.menuIndex < 0 && root.fanKey !== cell.key && root.dragKey === ""
               anchors.horizontalCenter: parent.horizontalCenter
               anchors.bottom: parent.top
               anchors.bottomMargin: 8
@@ -1046,10 +1287,20 @@ Item {
                 Repeater {
                   model: {
                     var app = cell.app
-                    var m = [
+                    var m = []
+                    // The app's windows by title, like macOS: ✓ the one in
+                    // focus, ◆ minimized ones.
+                    var act = root.activeWindow(app)
+                    for (var wi = 0; wi < Math.min(app.windows.length, 6); wi++) {
+                      var pl = (app.places || [])[wi] || {}
+                      m.push({ t: app.windows[wi].title || app.name, a: "win", i: wi,
+                               mark: wi === act ? "✓" : pl.minimized ? "◆" : "" })
+                    }
+                    if (app.windows.length > 1) m.push({ t: root.tr("Mostrar todas as janelas"), a: "expose" })
+                    m = m.concat([
                       { t: root.tr("Abrir nova janela"), a: "new" },
                       { t: app.pinned ? root.tr("Desafixar da dock") : root.tr("Fixar na dock"), a: "pin" }
-                    ]
+                    ])
                     if (root.cfg.moveMenu && app.windows.length > 0) {
                       var only = app.workspaces.length === 1 ? app.workspaces[0] : -1
                       for (var i = 0; i < root.workspaceList.length; i++) {
@@ -1072,12 +1323,24 @@ Item {
                     radius: 6
                     color: ma.containsMouse ? Qt.rgba(1, 1, 1, 0.1) : "transparent"
                     Text {
+                      visible: !!modelData.mark
                       anchors.verticalCenter: parent.verticalCenter
                       anchors.left: parent.left
                       anchors.leftMargin: 8
+                      text: modelData.mark || ""
+                      color: Commons.Color.menu.text
+                      font.pixelSize: 11
+                    }
+                    Text {
+                      anchors.verticalCenter: parent.verticalCenter
+                      anchors.left: parent.left
+                      anchors.leftMargin: modelData.a === "win" ? 24 : 8
+                      width: parent.width - anchors.leftMargin - 8
+                      elide: Text.ElideRight
                       text: modelData.t
                       color: Commons.Color.menu.text
                       font.pixelSize: 13
+                      font.weight: modelData.a === "win" ? Font.Medium : Font.Normal
                     }
                     MouseArea {
                       id: ma
@@ -1086,7 +1349,9 @@ Item {
                       onClicked: {
                         var item = cell.app
                         root.menuIndex = -1
-                        if (modelData.a === "new") root.launch(item)
+                        if (modelData.a === "win") root.goToWindow(item, modelData.i)
+                        else if (modelData.a === "expose") root.expose(cell.key)
+                        else if (modelData.a === "new") root.launch(item)
                         else if (modelData.a === "pin") root.togglePin(item)
                         else if (modelData.a === "move") root.moveToWorkspace(item, modelData.ws)
                         else if (modelData.a === "min") root.minimize(item)
@@ -1100,12 +1365,156 @@ Item {
               }
             }
 
+            // Window fan: the app's windows open side by side above the
+            // icon, spread like a hand of cards (middle ones highest, the
+            // outer ones tilted out), each titled underneath.
+            Loader {
+              active: root.fanKey === cell.key
+              anchors.horizontalCenter: parent.horizontalCenter
+              anchors.horizontalCenterOffset: -root.spacing * cell.grow / 2
+              anchors.bottom: parent.top
+              width: 0
+              height: 0
+              sourceComponent: Item {
+                id: fan
+                readonly property var app: cell.app
+                readonly property int n: app.windows.length
+                readonly property real label: 28
+                readonly property real cardW: Math.min(170, win.width * 0.9 / Math.max(1, n))
+                // Negative: neighbours overlap a little, like cards held in a hand.
+                readonly property real gap: -cardW * 0.1
+                readonly property real cardH: cardW / 1.6
+                readonly property real rowW: n * cardW + (n - 1) * gap
+                // Kept on screen: slides sideways when the icon is near an edge.
+                readonly property real iconX: cell.centerX - root.spacing / 2
+                readonly property real shift: Math.max(16 + rowW / 2 - iconX, Math.min(0, win.width - 16 - rowW / 2 - iconX))
+                readonly property real mid: (n - 1) / 2
+                Repeater {
+                  model: fan.n
+                  Item {
+                    id: card
+                    required property int index
+                    readonly property var toplevel: fan.app.windows[index]
+                    readonly property var place: (fan.app.places || [])[index] || ({})
+                    readonly property bool active: toplevel === ToplevelManager.activeToplevel
+                    readonly property real c: index - fan.mid
+                    property real open: 0
+                    width: fan.cardW
+                    height: fan.cardH
+                    // Opens out of the icon into its spot on the arc.
+                    x: -width / 2 + open * (c * (fan.cardW + fan.gap) + fan.shift)
+                    y: -height - fan.label - 10 - open * (6 + (fan.mid * fan.mid - c * c) * 4)
+                    rotation: open * c * 4
+                    // The card under the pointer comes on top of its neighbours.
+                    z: cardMouse.containsMouse ? 1 : 0
+                    transformOrigin: Item.Bottom
+                    // Scale only, no fade: the dock's Liquid Glass is cut by alpha.
+                    scale: 0.35 + 0.65 * open
+                    NumberAnimation on open {
+                      from: 0; to: 1
+                      duration: 280
+                      easing.type: Easing.OutCubic
+                    }
+
+                    // Same glass as the plate (the fan lives on the dock's layer),
+                    // so translucent windows like the terminal look as they do.
+                    Rectangle {
+                      anchors.fill: parent
+                      radius: 12
+                      antialiasing: true
+                      color: Qt.rgba(Commons.Color.menu.background.r, Commons.Color.menu.background.g, Commons.Color.menu.background.b, root.cfg.opacity)
+                      border.width: cardMouse.containsMouse ? 2 : 1
+                      border.color: cardMouse.containsMouse ? Commons.Color.accent
+                        : Qt.rgba(Commons.Color.menu.text.r, Commons.Color.menu.text.g, Commons.Color.menu.text.b, card.active ? 0.45 : 0.18)
+                    }
+                    Item {
+                      anchors.fill: parent
+                      anchors.margins: 5
+                      opacity: card.place.minimized ? 0.55 : 1
+                      // Translucent windows (foot is at alpha 0.7) show the
+                      // wallpaper through their glass on the desktop; without
+                      // it behind them the thumbnail turns into a black box.
+                      // Decoded tiny and scaled up smooth = a soft blur.
+                      Image {
+                        anchors.fill: cview
+                        visible: cview.hasContent
+                        source: "file://" + Quickshell.env("HOME") + "/.local/state/omarchy/current/background"
+                        sourceSize: Qt.size(48, 30)
+                        fillMode: Image.PreserveAspectCrop
+                        smooth: true
+                        cache: false
+                      }
+                      ScreencopyView {
+                        id: cview
+                        readonly property real aspect: sourceSize.height > 0 ? sourceSize.width / sourceSize.height : 16 / 10
+                        anchors.centerIn: parent
+                        width: Math.min(parent.width, parent.height * aspect)
+                        height: Math.min(parent.height, parent.width / aspect)
+                        captureSource: card.toplevel || null
+                        live: true
+                        paintCursor: false
+                        constraintSize: Qt.size(width * 2, height * 2)
+                        visible: hasContent
+                        layer.enabled: true
+                        layer.smooth: true
+                      }
+                      Image {
+                        anchors.centerIn: parent
+                        visible: !cview.hasContent
+                        width: Math.min(parent.width, parent.height) * 0.5
+                        height: width
+                        sourceSize: Qt.size(256, 256)
+                        source: root.iconFor(root.iconCandidates(fan.app.appId), 0)
+                        smooth: true
+                        mipmap: true
+                      }
+                    }
+                    Rectangle {
+                      anchors.horizontalCenter: parent.horizontalCenter
+                      anchors.top: parent.bottom
+                      anchors.topMargin: 5
+                      width: Math.min(parent.width * 0.85, ctitle.implicitWidth + 16)
+                      height: 22
+                      radius: 11
+                      antialiasing: true
+                      color: cardMouse.containsMouse ? Commons.Color.accent
+                        : Qt.rgba(Commons.Color.menu.background.r, Commons.Color.menu.background.g, Commons.Color.menu.background.b, Math.max(0.36, root.cfg.opacity))
+                      border.width: 1
+                      border.color: Qt.rgba(Commons.Color.menu.text.r, Commons.Color.menu.text.g, Commons.Color.menu.text.b, 0.16)
+                      Text {
+                        id: ctitle
+                        anchors.centerIn: parent
+                        width: Math.min(implicitWidth, card.width * 0.85 - 16)
+                        elide: Text.ElideRight
+                        text: (card.toplevel && card.toplevel.title || fan.app.name) + (card.place.minimized ? root.tr(" — minimizada") : "")
+                        color: Commons.Color.menu.text
+                        font.pixelSize: 12
+                      }
+                    }
+                    MouseArea {
+                      id: cardMouse
+                      anchors.fill: parent
+                      anchors.bottomMargin: -fan.label
+                      hoverEnabled: true
+                      onContainsMouseChanged: root.fanHover(containsMouse)
+                      onClicked: {
+                        var app = fan.app, i = card.index
+                        root.fanKey = ""
+                        root.goToWindow(app, i)
+                      }
+                    }
+                  }
+                }
+              }
+            }
+
             MouseArea {
               id: tip
               anchors.fill: parent
               hoverEnabled: true
               acceptedButtons: Qt.LeftButton | Qt.RightButton | Qt.MiddleButton
               property bool hovered: containsMouse
+              onContainsMouseChanged: root.hoverApp(cell.key, containsMouse)
               preventStealing: true
               // Left button held and moved past a few pixels = drag, not click.
               property point pressAt
@@ -1125,6 +1534,8 @@ Item {
               onCanceled: if (moved) { moved = false; root.endDrag() }
               onClicked: function(m) {
                 if (moved) return
+                root.fanKey = ""
+                fanOpen.stop()
                 if (m.button === Qt.RightButton) root.menuIndex = root.menuIndex === cell.index ? -1 : cell.index
                 else if (m.button === Qt.MiddleButton) root.launch(cell.app)
                 else { root.menuIndex = -1; root.activate(cell.app) }
@@ -1294,8 +1705,9 @@ Item {
                   onIconListChanged: iconTry = 0
                   source: root.iconFor(iconList, iconTry)
                   onStatusChanged: if (status === Image.Error) Qt.callLater(() => iconTry++)
-                  sourceSize: Qt.size(64, 64)
+                  sourceSize: Qt.size(128, 128)
                   smooth: true
+                  mipmap: true
                   fillMode: Image.PreserveAspectFit
                   // Pops in when a window lands on this workspace.
                   scale: root.ready ? 0.4 : 1
