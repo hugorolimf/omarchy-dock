@@ -928,6 +928,7 @@ Item {
               color: Commons.Color.menu.background
               Text {
                 id: etitle
+                textFormat: Text.PlainText
                 anchors.centerIn: parent
                 width: Math.min(implicitWidth, parent.parent.width - 20)
                 elide: Text.ElideRight
@@ -1160,6 +1161,7 @@ Item {
                 border.color: Qt.rgba(Commons.Color.menu.text.r, Commons.Color.menu.text.g, Commons.Color.menu.text.b, 0.2)
                 Text {
                   id: removeLabel
+                  textFormat: Text.PlainText
                   anchors.centerIn: parent
                   text: root.tr("Remover")
                   color: Commons.Color.menu.text
@@ -1237,6 +1239,7 @@ Item {
               color: Commons.Color.accent
               Text {
                 id: badgeText
+                textFormat: Text.PlainText
                 anchors.centerIn: parent
                 text: parent.label
                 color: Commons.Color.menu.background
@@ -1259,6 +1262,7 @@ Item {
               border.color: Qt.rgba(Commons.Color.menu.text.r, Commons.Color.menu.text.g, Commons.Color.menu.text.b, 0.2)
               Text {
                 id: label
+                textFormat: Text.PlainText
                 anchors.centerIn: parent
                 text: cell.app.background ? cell.app.name + root.tr(" — em segundo plano") : cell.app.name
                 color: Commons.Color.menu.text
@@ -1323,6 +1327,7 @@ Item {
                     radius: 6
                     color: ma.containsMouse ? Qt.rgba(1, 1, 1, 0.1) : "transparent"
                     Text {
+                      textFormat: Text.PlainText
                       visible: !!modelData.mark
                       anchors.verticalCenter: parent.verticalCenter
                       anchors.left: parent.left
@@ -1332,6 +1337,7 @@ Item {
                       font.pixelSize: 11
                     }
                     Text {
+                      textFormat: Text.PlainText
                       anchors.verticalCenter: parent.verticalCenter
                       anchors.left: parent.left
                       anchors.leftMargin: modelData.a === "win" ? 24 : 8
@@ -1483,6 +1489,7 @@ Item {
                       border.color: Qt.rgba(Commons.Color.menu.text.r, Commons.Color.menu.text.g, Commons.Color.menu.text.b, 0.16)
                       Text {
                         id: ctitle
+                        textFormat: Text.PlainText
                         anchors.centerIn: parent
                         width: Math.min(implicitWidth, card.width * 0.85 - 16)
                         elide: Text.ElideRight
@@ -1676,6 +1683,7 @@ Item {
             Behavior on color { ColorAnimation { duration: 160 } }
 
             Text {
+              textFormat: Text.PlainText
               anchors.left: parent.left
               anchors.leftMargin: 5
               anchors.verticalCenter: parent.verticalCenter
@@ -1716,6 +1724,7 @@ Item {
                 }
               }
               Text {
+                textFormat: Text.PlainText
                 visible: tile.apps.length > 4
                 width: root.miniSize
                 height: width

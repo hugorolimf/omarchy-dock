@@ -83,6 +83,7 @@ Panel {
 
         Text {
           id: title
+          textFormat: Text.PlainText
           text: "Dock"
           color: root.fg
           font.family: root.fontFamily
@@ -270,12 +271,14 @@ Panel {
       height: dsLabel.implicitHeight
       Text {
         id: dsLabel
+        textFormat: Text.PlainText
         text: ds.label
         color: root.fg
         font.family: root.fontFamily
         font.pixelSize: Style.font.bodySmall
       }
       Text {
+        textFormat: Text.PlainText
         anchors.right: parent.right
         text: ds.format(dsSlider.dragging ? dsSlider.liveValue : ds.value)
         color: root.fg
