@@ -39,6 +39,16 @@ Icons that swell under your pointer, one dock per screen, and real refractive gl
   another workspace, minimize, restore, close windows, quit the app.
 - 🌍 English and Portuguese, following your system language.
 
+## See it
+
+Recorded on a real desktop, mouse included.
+
+**Every window, at a glance**: two windows of the same app, one dot each under its icon;
+rest the pointer and they fan out as live thumbnails; click one to go to it. On the
+right, this screen's workspaces with the icons of their windows.
+
+![Window thumbnails fanning out above the dock](assets/windows.gif)
+
 ## Install
 
 ```bash
