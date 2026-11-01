@@ -26,7 +26,7 @@ Icons that swell under your pointer, one dock per screen, and real refractive gl
   Clicking a focused app minimizes it too, like the Windows taskbar.
 - 📌 **Pin, drag, reorder.** Drag icons around; drop a running app among the pinned
   ones to keep it. Drag a window onto a workspace in the dock to move it there (this
-  one needs a [window script](#window-scripts-optional)).
+  one needs [Smart Windows](https://github.com/hugorolimf/omarchy-smart-windows)).
 - 🃏 **Every window, at a glance.** One dot per open window under each icon. Rest the
   pointer on an app with several windows and they rise above its icon as live
   thumbnails: click the one you want.
@@ -116,7 +116,8 @@ a maximized window; 0 only when auto-hide is on):
 | `windowing_quit(class)` | Quit from the right-click menu |
 | `windowing_refit(monitor)` | the dock shows or hides, or its line moves |
 
-Dragging a window onto a workspace tile needs a script too. It watches the drag and
+Dragging a window onto a workspace tile needs a script too;
+[Smart Windows](https://github.com/hugorolimf/omarchy-smart-windows) has one. It watches the drag and
 writes `seq phase address ws cx cy fx fy fw fh` lines to `<state folder>/drag`; the
 dock shows itself when a drag starts and lists its tiles in `tiles-<monitor>`
 (`id x y w h`, global pixels). Without such a script the rest of the dock works the same.
