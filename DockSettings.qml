@@ -28,7 +28,9 @@ FileView {
     property bool compact: false
     property real compactScale: 0.6
     property int iconSize: 48
+    property bool plainIcons: true
     property bool magnify: true
+    property bool showMinimized: true
     property real maxScale: 1.7
     property real opacity: 0.72
     property bool liquidGlass: false

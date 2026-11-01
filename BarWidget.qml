@@ -11,7 +11,7 @@ Panel {
 
   // Portuguese is the source language; anything else gets English.
   readonly property bool portuguese: Qt.locale().name.indexOf("pt") === 0
-  readonly property var english: ({"Comportamento": "Behavior", "Áreas": "Workspaces", "Aparência": "Look", "Ocultar automaticamente": "Hide automatically", "Como no macOS: a dock some e volta quando o mouse encosta na borda inferior. Desligado, ela fica sempre visível.": "Like macOS: the dock hides and comes back when the pointer touches the bottom edge. Off, it always stays visible.", "Atraso para aparecer": "Reveal delay", "Compacta sem o mouse": "Compact without the pointer", "A dock encolhe quando o mouse sai e volta ao tamanho normal quando ele chega.": "The dock shrinks when the pointer leaves and grows back when it arrives.", "Ampliar ao passar o mouse": "Magnify on hover", "Mostrar áreas de trabalho": "Show workspaces", "No lado direito da dock: cada área com os ícones das suas janelas. Clique para trocar, role para passar de uma a outra.": "On the right of the dock: each workspace with its windows' icons. Click to switch, scroll to step through them.", "Número da área no ícone": "Workspace number on icons", "Mostra em qual área estão as janelas de um app quando elas não estão na área atual.": "Shows which workspace an app's windows are on when they are not on the current one.", "Mover para outra área no menu": "Move to workspace in the menu", "O botão direito no ícone ganha \"Mover para a área N\".": "Right-clicking an icon adds \"Move to workspace N\".", "Só apps deste monitor": "Only apps on this monitor", "Cada monitor tem sua dock; além dos fixados, ela mostra apenas os apps com janela naquele monitor.": "Every monitor has its own dock; besides pinned apps, it shows only apps with a window on that monitor.", "Só apps desta área": "Only apps on this workspace", "Além dos fixados, a dock mostra apenas os apps com janela na área atual.": "Besides pinned apps, the dock shows only apps with a window on the current workspace.", "Tamanho dos ícones": "Icon size", "Tamanho compacto": "Compact size", "Ampliação": "Magnification", "Opacidade do fundo": "Background opacity", "Vidro do plugin Liquid Glass atrás da dock. Ao ligar, o fundo fica mais transparente para o vidro aparecer.": "Glass from the Liquid Glass plugin behind the dock. Turning it on makes the plate more transparent so the glass shows."})
+  readonly property var english: ({"Comportamento": "Behavior", "Áreas": "Workspaces", "Aparência": "Look", "Ocultar automaticamente": "Hide automatically", "Como no macOS: a dock some e volta quando o mouse encosta na borda inferior. Desligado, ela fica sempre visível.": "Like macOS: the dock hides and comes back when the pointer touches the bottom edge. Off, it always stays visible.", "Atraso para aparecer": "Reveal delay", "Compacta sem o mouse": "Compact without the pointer", "A dock encolhe quando o mouse sai e volta ao tamanho normal quando ele chega.": "The dock shrinks when the pointer leaves and grows back when it arrives.", "Ampliar ao passar o mouse": "Magnify on hover", "Minimizadas na dock": "Minimized in the dock", "Como no macOS: a janela minimizada vira uma miniatura na ponta direita da dock. Clique nela para trazer de volta.": "Like macOS: a minimized window becomes a thumbnail at the right end of the dock. Click it to bring it back.", "Mostrar áreas de trabalho": "Show workspaces", "No lado direito da dock: cada área com os ícones das suas janelas. Clique para trocar, role para passar de uma a outra.": "On the right of the dock: each workspace with its windows' icons. Click to switch, scroll to step through them.", "Número da área no ícone": "Workspace number on icons", "Mostra em qual área estão as janelas de um app quando elas não estão na área atual.": "Shows which workspace an app's windows are on when they are not on the current one.", "Mover para outra área no menu": "Move to workspace in the menu", "O botão direito no ícone ganha \"Mover para a área N\".": "Right-clicking an icon adds \"Move to workspace N\".", "Só apps deste monitor": "Only apps on this monitor", "Cada monitor tem sua dock; além dos fixados, ela mostra apenas os apps com janela naquele monitor.": "Every monitor has its own dock; besides pinned apps, it shows only apps with a window on that monitor.", "Só apps desta área": "Only apps on this workspace", "Além dos fixados, a dock mostra apenas os apps com janela na área atual.": "Besides pinned apps, the dock shows only apps with a window on the current workspace.", "Tamanho dos ícones": "Icon size", "Ícones sem fundo": "Icons without a plate", "Tira o fundo escuro que alguns apps põem atrás do logo, como Obsidian e Zen.": "Removes the dark plate some apps put behind their logo, like Obsidian and Zen.", "Tamanho compacto": "Compact size", "Ampliação": "Magnification", "Opacidade do fundo": "Background opacity", "Vidro do plugin Liquid Glass atrás da dock. Ao ligar, o fundo fica mais transparente para o vidro aparecer.": "Glass from the Liquid Glass plugin behind the dock. Turning it on makes the plate more transparent so the glass shows."})
   function tr(text) { return portuguese ? text : (english[text] || text) }
   moduleName: "io.github.hugorolimf.dock"
   ipcTarget: "io.github.hugorolimf.dock"
@@ -33,7 +33,7 @@ Panel {
     "-- io.github.hugorolimf.dock: Liquid Glass on the dock. Written by the dock's bar panel; turn it off there.",
     "if hl.plugin.hyprglass then",
     "  hl.plugin.hyprglass.config({ layers = { enabled = true, namespaces = \"omarchy-dock\" } })",
-    "  hl.plugin.hyprglass.layer(\"omarchy-dock\", { mask_threshold = 0.05, live_resample = false })",
+    "  hl.plugin.hyprglass.layer(\"omarchy-dock\", { mask_threshold = 0.05, live_resample = false, mask_mode = \"alpha_region\" })",
     "end"
   ].join("\n")
 
@@ -154,6 +154,12 @@ Panel {
                 checked: root.cfg.magnify
                 onClicked: root.cfg.magnify = !root.cfg.magnify
               }
+              DockToggle {
+                label: root.tr("Minimizadas na dock")
+                description: root.tr("Como no macOS: a janela minimizada vira uma miniatura na ponta direita da dock. Clique nela para trazer de volta.")
+                checked: root.cfg.showMinimized
+                onClicked: root.cfg.showMinimized = !root.cfg.showMinimized
+              }
             }
 
             Column {
@@ -222,6 +228,12 @@ Panel {
                 value: root.cfg.maxScale
                 format: function(v) { return v.toFixed(1) + "×" }
                 onCommit: function(v) { root.cfg.maxScale = Math.round(v * 10) / 10 }
+              }
+              DockToggle {
+                label: root.tr("Ícones sem fundo")
+                description: root.tr("Tira o fundo escuro que alguns apps põem atrás do logo, como Obsidian e Zen.")
+                checked: root.cfg.plainIcons
+                onClicked: root.cfg.plainIcons = !root.cfg.plainIcons
               }
               DockSlider {
                 label: root.tr("Opacidade do fundo")
